@@ -251,3 +251,255 @@ $ grpcurl -plaintext -d '{"pkgName":"etcd","channelName":"alpha"}' localhost:500
   ]
 }
 ```
+
+
+Install the 3rd level operators via operator-registry(ocp 4.2)
+Usually, we install the 3rd level Operators via the `OperatorSource`. This way depends on marketplace-operator and OLM.
+
+Fortunately, we can also install the 3rd level Operators via the `operator-registry`. This way just depends on OLM.
+
+ 
+
+1) Clone the operator registry repo to your local.
+
+$ git clone git@github.com:operator-framework/operator-registry.git
+
+ 
+
+2) Checkout it to a new branch, for example:
+
+mac:operator-registry jianzhang$ git branch
+
+  etcd-env
+
+* etcd-role
+
+  master
+
+ 
+
+3) Open another terminal and clone the community-operators repo to your local. The 3rd level operators' bundles store in it.
+
+$git clone git@github.com:operator-framework/community-operators.git
+
+Find your operator's source folder.
+
+ 
+
+4) Switch back to your `operator-registry` terminal. Copy your operator's source folder to `manifests/` folder. For example, copy etcd-operator source folder:
+
+mac:manifests jianzhang$ pwd
+
+/Users/jianzhang/goproject/src/github.com/operator-framework/operator-registry/manifests
+
+mac:manifests jianzhang$ cp -r /Users/jianzhang/goproject/src/github.com/operator-framework/community-operators/community-operators/etcd .
+
+ 
+
+5) Build a Docker image. And, push it to your Quay repo. Note: your quay repo must be Public. For example:
+
+mac:operator-registry jianzhang$ docker build -f upstream-example.Dockerfile -t quay.io/jiazha/etcd-operator:bug-1732302 .
+
+Sending build context to Docker daemon   60.3MB
+
+Step 1/10 : FROM quay.io/operator-framework/upstream-registry-builder as builder
+
+---> 4dcb7a288493
+
+Step 2/10 : COPY manifests manifests
+
+---> 6caeaa19d212
+
+Step 3/10 : RUN ./bin/initializer -o ./bundles.db
+
+---> Running in bd06ba6eb178
+
+time="2019-08-01T05:27:17Z" level=info msg="loading Bundles" dir=manifests
+
+time="2019-08-01T05:27:17Z" level=info msg=directory dir=manifests file=manifests load=bundles
+
+time="2019-08-01T05:27:17Z" level=info msg=directory dir=manifests file=etcd load=bundles
+
+time="2019-08-01T05:27:17Z" level=info msg="found csv, loading bundle" dir=manifests file=etcdoperator.v0.9.4-clusterwide.clusterserviceversion.yaml load=bundles
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcd.package.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="could not decode contents of file manifests/etcd/etcd.package.yaml into file: error unmarshaling JSON: Object 'Kind' is missing in '{\"channels\":[{\"currentCSV\":\"etcdoperator.v0.9.4-clusterwide\",\"name\":\"clusterwide-alpha\"}],\"defaultChannel\":\"clusterwide-alpha\",\"packageName\":\"etcd\"}'" dir=manifests file=etcd.package.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcdbackup.crd.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcdcluster.crd.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcdclusterrole.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcdclusterrolebinding.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcdoperator.v0.9.4-clusterwide.clusterserviceversion.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading bundle file" dir=manifests file=etcdrestore.crd.yaml load=bundle
+
+time="2019-08-01T05:27:17Z" level=info msg="loading Packages and Entries" dir=manifests
+
+time="2019-08-01T05:27:17Z" level=info msg=directory dir=manifests file=manifests load=package
+
+time="2019-08-01T05:27:17Z" level=info msg=directory dir=manifests file=etcd load=package
+
+Removing intermediate container bd06ba6eb178
+
+---> b581d36c6ec0
+
+Step 4/10 : FROM scratch
+
+--->
+
+Step 5/10 : COPY --from=builder /build/bundles.db /bundles.db
+
+---> 855b34e3f395
+
+Step 6/10 : COPY --from=builder /build/bin/registry-server /registry-server
+
+---> 5cba9b211010
+
+Step 7/10 : COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe
+
+---> ddc07431f1a8
+
+Step 8/10 : EXPOSE 50051
+
+---> Running in b59c16ea86d0
+
+Removing intermediate container b59c16ea86d0
+
+---> 448b6b4299c2
+
+Step 9/10 : ENTRYPOINT ["/registry-server"]
+
+---> Running in 719a930afe21
+
+Removing intermediate container 719a930afe21
+
+---> 432fc056593a
+
+Step 10/10 : CMD ["--database", "bundles.db"]
+
+---> Running in e18ed2009add
+
+Removing intermediate container e18ed2009add
+
+---> b25276cabf1e
+
+Successfully built b25276cabf1e
+
+Successfully tagged quay.io/jiazha/etcd-operator:bug-1732302
+
+ 
+
+ 
+
+mac:operator-registry jianzhang$ docker push quay.io/jiazha/etcd-operator:bug-1732302
+
+The push refers to repository [quay.io/jiazha/etcd-operator]
+
+346144a22f81: Pushed
+
+3ee06ab4cb28: Layer already exists
+
+909c5c9477ae: Pushed
+
+bug-1732302: digest: sha256:0133bc711912786cf181b8ed7302455a2640aaaaceb85aab93afb307d7fab112 size: 4274
+
+ 
+
+6) File a CatalogSource object to consume your image and create it. Like blow:
+
+mac:~ jianzhang$ cat cs-bug.yaml
+
+apiVersion: operators.coreos.com/v1alpha1
+
+kind: CatalogSource
+
+metadata:
+
+  name: etcd-bug-operator
+
+  namespace: openshift-marketplace
+
+spec:
+
+  sourceType: grpc
+
+  image: quay.io/jiazha/etcd-operator:bug-1732302
+
+  displayName: ETCD Bug Operators
+
+  publisher: jian
+
+ 
+
+mac:~ jianzhang$ oc get catalogsource -n openshift-marketplace
+
+NAME                NAME                 TYPE   PUBLISHER   AGE
+
+etcd-bug-operator   ETCD Bug Operators   grpc   jian        36s
+
+ 
+
+You can check it by `oc get packagemanifest` command, like below:
+
+mac:~ jianzhang$ oc get packagemanifest
+
+NAME   CATALOG              AGE
+
+etcd   ETCD Bug Operators   84s
+
+ 
+
+7) Create a subscription to install your operator, for example, etcd-operator:
+
+mac:~ jianzhang$ cat sub-bug.yaml
+
+apiVersion: operators.coreos.com/v1alpha1
+
+kind: Subscription
+
+metadata:
+
+  generateName: etcd-bug-
+
+  namespace: openshift-operators
+
+spec:
+
+  source: etcd-bug-operator
+
+  sourceNamespace: openshift-marketplace
+
+  name: etcd
+
+  startingCSV: etcdoperator.v0.9.4-clusterwide
+
+  channel: clusterwide-alpha
+
+ 
+
+mac:~ jianzhang$ oc get sub -n openshift-operators
+
+NAME             PACKAGE   SOURCE              CHANNEL
+
+etcd-bug-l48n8   etcd      etcd-bug-operator   clusterwide-alpha
+
+ 
+
+mac:~ jianzhang$ oc get csv -n openshift-operators
+
+NAME                              DISPLAY   VERSION             REPLACES   PHASE
+
+etcdoperator.v0.9.4-clusterwide   etcd      0.9.4-clusterwide              Succeeded
+
+ 
+
+mac:~ jianzhang$ oc get pods -n openshift-operators
+
+NAME                             READY   STATUS    RESTARTS   AGE
+
+etcd-operator-7cd8588557-b2fsc   3/3     Running   0          24m
